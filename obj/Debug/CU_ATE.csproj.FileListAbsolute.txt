@@ -1,0 +1,17 @@
+C:\Code\Git\CUAutotextElement\CU_ATE\obj\Debug\CU_ATE.csprojResolveAssemblyReference.cache
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\CU_ATE.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\CU_ATE.pdb
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\CU_ATE.tlb
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.Framework.Engine.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.Geodatabase.Engine.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Microsoft.Practices.Composite.Presentation.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.Desktop.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.PresentationFramework.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.Process.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\ESRI.ArcGIS.ADF.Connection.Local.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Microsoft.Practices.Composite.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.PresentationCore.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\Miner.Windows.ArcGIS.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\bin\Debug\ESRI.ArcGIS.ADF.Connection.Local.xml
+C:\Code\Git\CUAutotextElement\CU_ATE\obj\Debug\CU_ATE.dll
+C:\Code\Git\CUAutotextElement\CU_ATE\obj\Debug\CU_ATE.pdb
