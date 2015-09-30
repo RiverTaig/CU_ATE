@@ -29,7 +29,7 @@ namespace Telvent.Designer.ATE
 	public class ConstructionNotesAte : DesignerATE
 	{
 		private string _NoFeatures = "No Features";
-		//We could also have an error text, if desired
+		//We could also have an error text, if that was desired
 
 		public ConstructionNotesAte()
 			: base("Schneider Electric Construction Notes",
