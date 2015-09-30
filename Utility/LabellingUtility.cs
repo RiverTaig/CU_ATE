@@ -11,8 +11,8 @@ using ADODB;
 
 namespace Telvent.Designer.Utility
 {
-    internal static class LabellingUtility
-    {
+	internal static class LabellingUtility
+	{
 		private const string _ProgID = "SE.Applications.Designer.Utility.LabellingUtility";
 
 		public static string TransformXml(System.Xml.XmlDocument Document, string XslPath)
@@ -87,10 +87,10 @@ namespace Telvent.Designer.Utility
 		/// <param name="FilterExtent">Optional, if not null it will be used to filter the notes to the current extent</param>
 		/// <param name="UseLookupTable">Whether to perform a search / replace of the CUNames in the Design before outputting them</param>
 		/// <returns></returns>
-        public static string GetConstructionNotes(IMMPxApplication PxApp, IMMPersistentXML ListItem, IEnvelope FilterExtent)
-        {
-            if (PxApp == null)
-                throw new Exception("No Px Application found");
+		public static string GetConstructionNotes(IMMPxApplication PxApp, IMMPersistentXML ListItem, IEnvelope FilterExtent)
+		{
+			if (PxApp == null)
+				throw new Exception("No Px Application found");
 			if (ListItem == null)
 				throw new Exception("No item given to generate notes for");
 
@@ -209,7 +209,7 @@ namespace Telvent.Designer.Utility
 			}
 
 			return TransformXml(modernDocument, XslPath);
-        }
+		}
 
 		enum LabelXmlType
 		{
@@ -220,6 +220,215 @@ namespace Telvent.Designer.Utility
 			Custom,
 			//DesignerExpress,
 		}
+
+		public static string GetCUList(IMMPxApplication PxApp, IMMPersistentXML ListItem, IEnvelope FilterExtent)
+		{
+			if (PxApp == null)
+				throw new Exception("No Px Application found");
+			if (ListItem == null)
+				throw new Exception("No item given to generate notes for");
+
+			string XslPath = "";
+			try
+			{
+				XslPath = DesignerUtility.GetPxConfig(PxApp, Constants.PxConfig_ContstructionNotesXslPath);
+				if (string.IsNullOrEmpty(XslPath))
+					throw new Exception("Obtained an empty reference to the Construction Notes Stylesheet.  Ask your administrator to verify the Px Configuration.");
+			}
+			catch (Exception ex)
+			{
+				throw new Exception("Unable to find a Px Configuration for the Construction Notes Stylesheet.  Ask your administrator to verify the Px Configuration.", ex);
+			}
+
+			//Our resulting XML must have Work Locations / Gis Units in order to filter it
+			System.Xml.XmlDocument modernDocument = null;
+			string labelXmlType = DesignerUtility.GetPxConfig(PxApp, Constants.PxConfig_ContstructionNotesXmlSource);
+			switch (labelXmlType)
+			{
+				case "DesignTree":
+					modernDocument = GetReportingXml(PxApp, ListItem, LabelXmlType.DesignTree);
+					break;
+				default:
+				case "DesignerXml":
+					modernDocument = GetReportingXml(PxApp, ListItem, LabelXmlType.DesignerXml);
+					break;
+				case "PxXml":
+					modernDocument = GetReportingXml(PxApp, ListItem, LabelXmlType.PxXml);
+					break;
+				case "CostEngine":
+					modernDocument = GetReportingXml(PxApp, ListItem, LabelXmlType.CostEngine);
+					break;
+				case "Custom":
+					modernDocument = GetReportingXml(PxApp, ListItem, LabelXmlType.Custom);
+					break;
+			}
+
+			if (FilterExtent != null)
+			{
+				#region Fitler the Design Xml
+
+				IRelationalOperator IRO = FilterExtent as IRelationalOperator;
+
+				//Build up a list of Work Locations in the current extent
+				List<string> BadWls = new List<string>();
+				List<string> BadGus = new List<string>();
+
+				ID8ListItem WlOrCu = null;
+				ID8ListItem GivenItem = ListItem as ID8ListItem;
+				if (GivenItem == null)
+					throw new ApplicationException("Selected item is not a valid list item");
+
+				if (GivenItem.ItemType == mmd8ItemType.mmd8itWorkRequest)
+				{
+					((ID8List)GivenItem).Reset();
+					ID8List Design = ((ID8List)GivenItem).Next(false) as ID8List;
+					GivenItem = Design as ID8ListItem;
+					((ID8List)GivenItem).Reset();
+					WlOrCu = ((ID8List)GivenItem).Next(false);
+				}
+				else if (GivenItem.ItemType == mmd8ItemType.mmd8itDesign)
+				{
+					((ID8List)GivenItem).Reset();
+					WlOrCu = ((ID8List)GivenItem).Next(false);
+				}
+				else if (GivenItem.ItemType == mmd8ItemType.mmd8itWorkLocation)
+				{
+					WlOrCu = (ID8ListItem)GivenItem;
+				}
+				else
+					throw new ApplicationException("Construction notes are not supported on the selected item");
+
+				while (WlOrCu != null)
+				{
+					if (WlOrCu.ItemType == mmd8ItemType.mmd8itWorkLocation)
+					{
+						if (!HasD8ChildInExtent(IRO, WlOrCu as ID8List))
+							BadWls.Add(((ID8WorkLocation)WlOrCu).ID);
+					}
+					else
+					{
+						if (WlOrCu.ItemType == mmd8ItemType.mmitMMGisUnit)
+						{
+							if (!HasD8ChildInExtent(IRO, WlOrCu as ID8List))
+								BadGus.Add(((IMMGisUnit)WlOrCu).GisUnitID.ToString());
+						}
+					}
+
+					WlOrCu = ((ID8List)GivenItem).Next(false);
+				}
+
+				string wlquery = "";
+				foreach (string wlid in BadWls)
+					if (!string.IsNullOrEmpty(wlid))
+						wlquery += "//WORKLOCATION[ID='" + wlid + "']|";
+				wlquery = wlquery.TrimEnd("|".ToCharArray());
+
+				string guquery = "";
+				foreach (string guid in BadGus)
+					if (!string.IsNullOrEmpty(guid))
+						guquery += "//GISUNIT[DESIGNER_ID='" + guid + "']|";
+				guquery = guquery.TrimEnd("|".ToCharArray());
+
+				string query = wlquery + "|" + guquery;
+				query = query.Trim("|".ToCharArray());
+
+				//Filter the xml document to remove the bad wls
+				if (!string.IsNullOrEmpty(query))
+				{
+					foreach (System.Xml.XmlNode BadNode in modernDocument.SelectNodes(query))
+						BadNode.ParentNode.RemoveChild(BadNode);
+				}
+
+				#endregion
+			}
+
+			string transformXML =  TransformXml(modernDocument, XslPath);
+			string[] result = transformXML.Split(new string[] { "\n", "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+			var installList = new Dictionary<string, int>();
+			var abandonList = new Dictionary<string, int>();
+			var removeList = new Dictionary<string, int>();
+			var unknownList = new Dictionary<string, int>();
+			Dictionary<string, int> activeList = null;
+			foreach (string line in result)
+			{
+				if (line.ToUpper().Contains("INSTALL"))
+				{
+					activeList = installList;
+				} 
+				if (line.ToUpper().Contains("REMOVE"))
+				{
+					activeList = removeList;
+				}
+				if (line.ToUpper().Contains("ABANDON"))
+				{
+					activeList = abandonList;
+				}
+				if (line.ToUpper().Contains("UNKNOWN"))
+				{
+					activeList = unknownList;
+				}
+				if (activeList != null)
+				{
+					if (line.StartsWith("("))
+					{
+						int quantity = Convert.ToInt16( line.Substring(1, line.IndexOf(")") - 1));
+						string cu = line.Substring(line.IndexOf(")") + 1);
+						if (activeList.ContainsKey(cu) == false)
+						{
+							activeList.Add(cu, 0);
+						}
+						activeList[cu] += quantity;
+					}
+					
+				}
+			}
+			StringBuilder sb = new StringBuilder();
+			if (installList.Count > 0)
+			{
+				sb.Append("<BOL>    INSTALL</BOL>");
+				foreach (KeyValuePair<string, int> kvp in installList)
+				{
+					sb.Append("\r\n");
+					sb.Append("(" + kvp.Value + ") " + kvp.Key);
+				}
+			}
+			if (removeList.Count > 0)
+			{
+				if (sb.Length > 0) { sb.Append("\r\n"); }
+				sb.Append("<BOL>    REMOVE</BOL>");
+				
+				foreach (KeyValuePair<string, int> kvp in removeList)
+				{
+					sb.Append("\r\n");
+					sb.Append("(" + kvp.Value + ") " + kvp.Key);
+				}
+			}
+			if (abandonList.Count > 0)
+			{
+				if (sb.Length > 0) { sb.Append("\r\n"); }
+				sb.Append("<BOL>    ABANDON</BOL>");
+				
+				foreach (KeyValuePair<string, int> kvp in abandonList)
+				{
+					sb.Append("\r\n");
+					sb.Append("(" + kvp.Value + ") " + kvp.Key);
+				}
+			}
+			if (unknownList.Count > 0)
+			{
+				if (sb.Length > 0) { sb.Append("\r\n"); }
+				sb.Append("<BOL>    UNKNOWN</BOL>");
+				
+				foreach (KeyValuePair<string, int> kvp in unknownList)
+				{
+					sb.Append("\r\n");
+					sb.Append("(" + kvp.Value + ") " + kvp.Key);
+				}
+			}
+			return sb.ToString();
+		}
+
+
 		private static System.Xml.XmlDocument GetReportingXml(IMMPxApplication PxApp, IMMPersistentXML ListItem, LabelXmlType XmlType)
 		{
 			if (PxApp == null)
@@ -319,59 +528,59 @@ namespace Telvent.Designer.Utility
 			return null;
 		}
 
-        /// <summary>
-        /// Recursively parses a d8list and determines in any of the features
-        /// are in the extent.  Intended for use with an ATE.
-        /// </summary>
-        /// <param name="IRO">Bounding Extent</param>
-        /// <param name="List">Designer List Object</param>
-        /// <returns></returns>
-        private static bool HasD8ChildInExtent(IRelationalOperator IRO, ID8List List)
-        {
-            bool allchildrenoutofextent = true;
+		/// <summary>
+		/// Recursively parses a d8list and determines in any of the features
+		/// are in the extent.  Intended for use with an ATE.
+		/// </summary>
+		/// <param name="IRO">Bounding Extent</param>
+		/// <param name="List">Designer List Object</param>
+		/// <returns></returns>
+		private static bool HasD8ChildInExtent(IRelationalOperator IRO, ID8List List)
+		{
+			bool allchildrenoutofextent = true;
 
-            #region Check the current list item
+			#region Check the current list item
 
-            if (List is ID8GeoAssoc)
-            {
-                IFeature GuFeat = ((ID8GeoAssoc)List).AssociatedGeoRow as IFeature;
-                if (GuFeat != null && GuFeat.Shape != null)
-                {
-                    if (!IRO.Disjoint(GuFeat.Shape))
-                        allchildrenoutofextent = false;
-                }
-            }
+			if (List is ID8GeoAssoc)
+			{
+				IFeature GuFeat = ((ID8GeoAssoc)List).AssociatedGeoRow as IFeature;
+				if (GuFeat != null && GuFeat.Shape != null)
+				{
+					if (!IRO.Disjoint(GuFeat.Shape))
+						allchildrenoutofextent = false;
+				}
+			}
 
-            #endregion
+			#endregion
 
-            List.Reset();
-            ID8ListItem Child = List.Next(false);
-            while (Child != null && allchildrenoutofextent)
-            {
-                
-                #region Process children until we find a child inside the extent
+			List.Reset();
+			ID8ListItem Child = List.Next(false);
+			while (Child != null && allchildrenoutofextent)
+			{
+				
+				#region Process children until we find a child inside the extent
 
-                if (Child is ID8GeoAssoc)
-                {
-                    IFeature GuFeat = ((ID8GeoAssoc)Child).AssociatedGeoRow as IFeature;
-                    if (GuFeat != null && GuFeat.Shape != null)
-                    {
-                        if (!IRO.Disjoint(GuFeat.Shape))
-                            allchildrenoutofextent = false;
-                    }
-                }
+				if (Child is ID8GeoAssoc)
+				{
+					IFeature GuFeat = ((ID8GeoAssoc)Child).AssociatedGeoRow as IFeature;
+					if (GuFeat != null && GuFeat.Shape != null)
+					{
+						if (!IRO.Disjoint(GuFeat.Shape))
+							allchildrenoutofextent = false;
+					}
+				}
 
-                if (Child is ID8List)
-                    allchildrenoutofextent = !HasD8ChildInExtent(IRO, (ID8List)Child);
+				if (Child is ID8List)
+					allchildrenoutofextent = !HasD8ChildInExtent(IRO, (ID8List)Child);
 
-                Child = List.Next(false);
+				Child = List.Next(false);
 
-                #endregion
+				#endregion
 
-            }
+			}
 
-            return !allchildrenoutofextent;
-        }
+			return !allchildrenoutofextent;
+		}
 
 
 		/// <summary>
@@ -384,7 +593,7 @@ namespace Telvent.Designer.Utility
 		/// <param name="Table">Table to be queried</param>
 		/// <param name="nameLookup">Dictionary to return the results</param>
 		private static Dictionary<string, string> QueryLookupTable(ADODB.Connection processConnection, string[] Keys, string Value, string Table)
-        {
+		{
 			Dictionary<string, string> nameLookup = new Dictionary<string, string>();
 
 			if (Keys == null ||
@@ -397,7 +606,7 @@ namespace Telvent.Designer.Utility
 
 			string columns = string.Join(",", Keys);
 
-            //set up statement
+			//set up statement
 			string sql =
 				string.Format("SELECT {0},{1} FROM {2}",
 				//ScsConstants.FIELD_WMSCODE,
@@ -410,106 +619,106 @@ namespace Telvent.Designer.Utility
 
 			#endregion
 
-            Recordset recordSet = null;
-            try
-            {
+			Recordset recordSet = null;
+			try
+			{
 
-                #region Execute the Query
+				#region Execute the Query
 
-                try
-                {
-                    if (processConnection.ConnectionString.Contains(".mdb"))
-                        sql = sql.Replace("PROCESS.", "");
+				try
+				{
+					if (processConnection.ConnectionString.Contains(".mdb"))
+						sql = sql.Replace("PROCESS.", "");
 
-                    recordSet = GetRecordSet(processConnection, sql);
-                    recordSet.MoveFirst();
-                }
-                catch (Exception ex)
-                {
-                    //throw, noting the SQL
-                    throw new Exception("Error executing sql statement: " + sql, ex);
-                }
+					recordSet = GetRecordSet(processConnection, sql);
+					recordSet.MoveFirst();
+				}
+				catch (Exception ex)
+				{
+					//throw, noting the SQL
+					throw new Exception("Error executing sql statement: " + sql, ex);
+				}
 
-                #endregion
+				#endregion
 
-                string[] vals = new string[Keys.Length];
-                while (!recordSet.EOF)
-                {
+				string[] vals = new string[Keys.Length];
+				while (!recordSet.EOF)
+				{
 
-                    #region Process the results
+					#region Process the results
 
-                    string altdesc = "";
-                    try
-                    {
-                        object oval = null;
+					string altdesc = "";
+					try
+					{
+						object oval = null;
 
-                        //The alternate description isn't allowed to be null, this
-                        //would cause undesirable results in the construction notes
-                        oval = recordSet.Fields[Value].Value;
-                        if (oval == null || oval == DBNull.Value)
-                            continue;
+						//The alternate description isn't allowed to be null, this
+						//would cause undesirable results in the construction notes
+						oval = recordSet.Fields[Value].Value;
+						if (oval == null || oval == DBNull.Value)
+							continue;
 
-                        altdesc = oval.ToString();
+						altdesc = oval.ToString();
 
-                        //The pieces in the composite key are allowed to contain 
-                        //null values, if they are we give them a special value
-                        for (int i = 0; i < Keys.Length; i++)
-                        {
-                            oval = recordSet.Fields[Keys[i]].Value;
-                            if (oval == null || oval == DBNull.Value)
-                                vals[i] = "<Null>";
-                            else
-                                vals[i] = oval.ToString().ToUpper();
-                        }
-                        /*
-                        oval = recordSet.Fields[ScsConstants.FIELD_WMSCODE].Value;
-                        if (oval == null || oval == DBNull.Value)
-                            wmscode = "<Null>";
-                        else
-                            wmscode = oval.ToString().ToUpper();
+						//The pieces in the composite key are allowed to contain 
+						//null values, if they are we give them a special value
+						for (int i = 0; i < Keys.Length; i++)
+						{
+							oval = recordSet.Fields[Keys[i]].Value;
+							if (oval == null || oval == DBNull.Value)
+								vals[i] = "<Null>";
+							else
+								vals[i] = oval.ToString().ToUpper();
+						}
+						/*
+						oval = recordSet.Fields[ScsConstants.FIELD_WMSCODE].Value;
+						if (oval == null || oval == DBNull.Value)
+							wmscode = "<Null>";
+						else
+							wmscode = oval.ToString().ToUpper();
 
-                        oval = recordSet.Fields[ScsConstants.FIELD_CUNAME].Value;
-                        if (oval == null || oval == DBNull.Value)
-                            name = "<Null>";
-                        else
-                            name = oval.ToString().ToUpper();
-                        */
-                        string key = string.Join("\t", vals);
-                        if (!nameLookup.ContainsKey(key))
-                            nameLookup.Add(key, altdesc);
-                    }
-                    finally
-                    {
-                        //move next
-                        recordSet.MoveNext();
-                    }
+						oval = recordSet.Fields[ScsConstants.FIELD_CUNAME].Value;
+						if (oval == null || oval == DBNull.Value)
+							name = "<Null>";
+						else
+							name = oval.ToString().ToUpper();
+						*/
+						string key = string.Join("\t", vals);
+						if (!nameLookup.ContainsKey(key))
+							nameLookup.Add(key, altdesc);
+					}
+					finally
+					{
+						//move next
+						recordSet.MoveNext();
+					}
 
-                    #endregion
+					#endregion
 
-                }
-            }
-            finally
-            {
-                if (recordSet != null)
-                    recordSet.Close();
-                recordSet = null;
-            }
-            
-            return nameLookup;
-        }
+				}
+			}
+			finally
+			{
+				if (recordSet != null)
+					recordSet.Close();
+				recordSet = null;
+			}
+			
+			return nameLookup;
+		}
 
 
-        private static Recordset GetRecordSet(Connection connection, string sql)
-        {
-            //create new RecordSet
-            ADODB.RecordsetClass rset = new RecordsetClass();
+		private static Recordset GetRecordSet(Connection connection, string sql)
+		{
+			//create new RecordSet
+			ADODB.RecordsetClass rset = new RecordsetClass();
 
-            //open it
-            rset.Open(sql, connection, CursorTypeEnum.adOpenStatic, LockTypeEnum.adLockOptimistic, 0);
+			//open it
+			rset.Open(sql, connection, CursorTypeEnum.adOpenStatic, LockTypeEnum.adLockOptimistic, 0);
 
-            //return it
-            return rset;
-        }
+			//return it
+			return rset;
+		}
 
-    }
+	}
 }

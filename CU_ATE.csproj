@@ -41,6 +41,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <RegisterForComInterop>true</RegisterForComInterop>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -115,6 +116,7 @@
   <ItemGroup>
     <Compile Include="ATE\BaseATE.cs" />
     <Compile Include="ATE\ConstructionNotesAte.cs" />
+    <Compile Include="ATE\CUListATE.cs" />
     <Compile Include="ATE\DesignerATE.cs" />
     <Compile Include="Utility\Constants.cs" />
     <Compile Include="Utility\DesignerUtility.cs" />
@@ -140,9 +142,14 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="XSL\ConstructionNotes.xslt" />
+    <Content Include="XSL\ConstructionNotes.xslt">
+      <SubType>Designer</SubType>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>RegX.exe "$(TargetPath)" /r /c /s</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

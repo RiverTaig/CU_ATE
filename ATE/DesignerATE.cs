@@ -22,7 +22,7 @@ namespace Telvent.Designer.ATE
 {
 	/// <summary>
 	/// This base class simplifies the implementation of ATEs that 
-    /// inspect the D8TopLevel object.
+	/// inspect the D8TopLevel object.
 	/// </summary>
 	public abstract class DesignerATE: BaseATE
 	{
@@ -40,7 +40,7 @@ namespace Telvent.Designer.ATE
 		/// <returns></returns>
 		protected override string GetText(mmAutoTextEvents eTextEvent, IMMMapProductionInfo pMapProdInfo)
 		{
-            if (App == null)
+			if (App == null)
 				App = DesignerUtility.GetApplication();
 			if (App == null)
 			{
@@ -48,7 +48,7 @@ namespace Telvent.Designer.ATE
 				return _defaultDisplay;
 			}
 
-            ID8TopLevel topLevel = App.FindExtensionByName("DesignerTopLevel") as ID8TopLevel;
+			ID8TopLevel topLevel = App.FindExtensionByName("DesignerTopLevel") as ID8TopLevel;
 			if (topLevel == null)
 				return _defaultDisplay;
 

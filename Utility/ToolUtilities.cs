@@ -17,25 +17,25 @@ using Miner.Interop.Process;
 namespace Telvent.Designer.Utility
 {
 	public class ToolUtility
-    {
-        protected static readonly log4net.ILog _logger = log4net.LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+	{
+		protected static readonly log4net.ILog _logger = log4net.LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 		public static void LogError(string Message, Exception ex)
-        {
+		{
 			_logger.Error(Message, ex);
-        }
+		}
 		public static void LogError(string Message)
-        {
+		{
 			_logger.Error(Message);
-        }
+		}
 
 		public static void LogWarning(string Message, Exception ex)
-        {
-            _logger.Warn(Message, ex);//
-        }
+		{
+			_logger.Warn(Message, ex);//
+		}
 		public static void LogWarning(string Message)
-        {
+		{
 			_logger.Warn(Message);
-        }
-    }
+		}
+	}
 }
